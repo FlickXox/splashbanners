@@ -1,1 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Banner Viewer</title>
+<style>
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: url('https://official.garena.com/sg/v1/config/banner_ff.jpg') no-repeat center center fixed;
+    background-size: cover;
+    color: #eee;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(75,0,130,0.7);
+    z-index: -1;
+  }
 
+  header {
+    background: rgba(75,0,130,0.9);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+  }
+  header button {
+    background: none;
+    border: none;
+    color: #eee;
+    font-size: 16px;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+  }
+  header button.active,
+  header button:hover {
+    background: #a64ca6;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    border-bottom: 2px solid #a64ca6;
+    justify-content: center;
+  }
+  .tabs button {
+    background: none;
+    border: none;
+    color: #ccc;
+    font-weight: 600;
+    font-size: 18px;
+    padding: 6px 16px;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: border-color 0.3s, color 0.3s;
+  }
+  .tabs button.active {
+    color: #fff;
+    border-color: #d37ddb;
+  }
+
+  /* Both started & notstarted now vertical scroll, centered */
+  #started-banners,
+  #notstarted-banners {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    padding-bottom: 12px;
+    overflow-y: auto;
+    max-height: calc(100vh - 180px); /* prevent overflow */
+  }
+
+  .banner-card {
+    flex: 0 0 auto;
+    width: 320px; /* fixed size for all screens */
+    max-width: 90vw; /* shrink if very small screen */
+    border-radius: 12px;
+    background: rgba(0,0,0,0.5);
+    box-shadow: 0 0 10px #b470b4aa;
+    cursor: pointer;
+    transition: transform 0.25s ease;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeSlide 0.4s ease forwards;
+  }
+  .banner-card:hover, .banner-card:focus {
+    outline: none;
+    transform: scale(1.05);
+    box-shadow: 0 0 18px #d37ddb;
+  }
+  @keyframes fadeSlide {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .banner-card img {
+    width: 100%;
+    height: 180px; /* fixed height */
+    object-fit: cover;
+    border-radius: 12px 12px 0 0;
+    display: block;
+  }
+  .banner-info {
+    padding: 10px 14px;
+  }
+  .banner-info h3 {
+    margin: 0 0 4px 0;
+    font-size: 1.1rem;
+    color: #ddb9ff;
+  }
+  .banner-info p {
+    margin: 0;
+    color: #ccc;
+    font-size: 0.9rem;
+  }
+
+  #error-msg {
+    color: #ff6b6b;
+    margin-top: 12px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  #no-notstarted-msg {
+    color: #bbb;
+    margin-top: 12px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* Modal */
+  #modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(40, 0, 70, 0.9);
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+  #modal.active {
+    display: flex;
+  }
+  .modal-content {
+    background: #30004d;
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 400px;
+    width: 90vw;
+    box-shadow: 0 0 20px #9e4fffaa;
+    color: #eee;
+    position: relative;
+  }
+  .close-btn {
+    position: absolute;
+    top: 6px;
+    right: 12px;
+    font-size: 28px;
+    color: #d37ddb;
+    cursor: pointer;
+    border: none;
+    background: none;
+  }
+  .close-btn:hover {
+    color: #ff99ff;
+  }
+  #download-btn {
+    margin-top: 14px;
+    background: #a64ca6;
+    border: none;
+    color: white;
+    padding: 10px 18px;
+    font-size: 1rem;
+    border-radius: 8px;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s;
+  }
+  #download-btn:hover {
+    background: #d37ddb;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div id="mode-buttons">
+    <button id="btn-cis" class="active">CIS</button>
+    <button id="btn-sg">SG</button>
+  </div>
+</header>
+
+<main>
+  <div class="tabs" id="tab-buttons">
+    <button id="tab-started" class="active">Started</button>
+    <button id="tab-notstarted">Not Started</button>
+  </div>
+
+  <div id="error-msg" style="display:none;"></div>
+
+  <div id="started-banners"></div>
+  <div id="notstarted-banners" style="display:none;"></div>
+  <div id="no-notstarted-msg" style="display:none;">Not started events not found, coming soon!</div>
+</main>
+
+<!-- Modal -->
+<div id="modal">
+  <div class="modal-content">
+    <button class="close-btn">&times;</button>
+    <h3 id="modal-name">Banner Name</h3>
+    <p><strong>Start Time:</strong> <span id="modal-starttime">N/A</span></p>
+    <p><strong>Region:</strong> <span id="modal-region">N/A</span></p>
+    <button id="download-btn">Download Banner</button>
+  </div>
+</div>
+
+<script>
+  const btnCIS = document.getElementById('btn-cis');
+  const btnSG = document.getElementById('btn-sg');
+  const startedContainer = document.getElementById('started-banners');
+  const notStartedContainer = document.getElementById('notstarted-banners');
+  const noNotStartedMsg = document.getElementById('no-notstarted-msg');
+  const errorMsg = document.getElementById('error-msg');
+  const modal = document.getElementById('modal');
+  const modalName = document.getElementById('modal-name');
+  const modalStartTime = document.getElementById('modal-starttime');
+  const modalRegion = document.getElementById('modal-region');
+  const downloadBtn = document.getElementById('download-btn');
+  const closeBtn = modal.querySelector('.close-btn');
+  const tabStarted = document.getElementById('tab-started');
+  const tabNotStarted = document.getElementById('tab-notstarted');
+
+  let currentMode = 'cis';
+  let banners = [];
+  let activeTab = 'started';
+
+  function formatKyrgyzTime(unixSec) {
+    if (!unixSec) return 'N/A';
+    const date = new Date(unixSec * 1000);
+    const kyrgDate = new Date(date.getTime() + 6 * 3600 * 1000);
+    return kyrgDate.toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    });
+  }
+
+  function clearAll() {
+    startedContainer.innerHTML = '';
+    notStartedContainer.innerHTML = '';
+    errorMsg.style.display = 'none';
+    noNotStartedMsg.style.display = 'none';
+  }
+
+  function createBannerCard(banner) {
+    if (!banner.url) return null;
+    const card = document.createElement('div');
+    card.className = 'banner-card';
+    card.tabIndex = 0;
+
+    const img = document.createElement('img');
+    img.src = banner.url;
+    img.alt = banner.name || 'Banner';
+
+    const info = document.createElement('div');
+    info.className = 'banner-info';
+
+    const name = document.createElement('h3');
+    name.textContent = banner.name || 'N/A';
+
+    const region = document.createElement('p');
+    region.textContent = 'Region: ' + (banner.region || 'N/A');
+
+    info.appendChild(name);
+    info.appendChild(region);
+    card.appendChild(img);
+    card.appendChild(info);
+
+    card.addEventListener('click', () => openModal(banner));
+    card.addEventListener('keydown', e => { if(e.key === 'Enter') openModal(banner); });
+
+    return card;
+  }
+
+  function openModal(banner) {
+    modalName.textContent = banner.name || 'N/A';
+    modalRegion.textContent = banner.region || 'N/A';
+    modalStartTime.textContent = formatKyrgyzTime(banner.timestamp);
+    downloadBtn.onclick = () => {
+      if (banner.url) {
+        const link = document.createElement('a');
+        link.href = banner.url;
+        link.download = (banner.name || 'banner') + '.jpg';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    };
+    modal.classList.add('active');
+  }
+
+  closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+  modal.addEventListener('click', e => { if(e.target === modal) modal.classList.remove('active'); });
+
+  tabStarted.addEventListener('click', () => {
+    if(activeTab === 'started') return;
+    activeTab = 'started';
+    tabStarted.classList.add('active');
+    tabNotStarted.classList.remove('active');
+    startedContainer.style.display = 'flex';
+    notStartedContainer.style.display = 'none';
+    noNotStartedMsg.style.display = 'none';
+  });
+
+  tabNotStarted.addEventListener('click', () => {
+    if(activeTab === 'notstarted') return;
+    activeTab = 'notstarted';
+    tabNotStarted.classList.add('active');
+    tabStarted.classList.remove('active');
+    startedContainer.style.display = 'none';
+    notStartedContainer.style.display = 'flex';
+    noNotStartedMsg.style.display = notStartedContainer.children.length === 0 ? 'block' : 'none';
+  });
+
+  async function fetchBanners(mode) {
+    clearAll();
+    try {
+      const res = await fetch(`/api/banner/${mode}/s444`);
+      if (!res.ok) throw new Error(`Network response was not ok: ${res.status}`);
+      const data = await res.json();
+      if (!data || !Array.isArray(data.banners)) throw new Error('Invalid data format');
+
+      banners = data.banners;
+      const nowKyrgyz = Date.now() + 6 * 3600 * 1000;
+
+      const started = [];
+      const notStarted = [];
+
+      banners.forEach(b => {
+        if (b.timestamp && (b.timestamp * 1000) <= nowKyrgyz) {
+          started.push(b);
+        } else {
+          notStarted.push(b);
+        }
+      });
+
+      started.forEach(b => {
+        const card = createBannerCard(b);
+        if (card) startedContainer.appendChild(card);
+      });
+      notStarted.forEach(b => {
+        const card = createBannerCard(b);
+        if (card) notStartedContainer.appendChild(card);
+      });
+
+      noNotStartedMsg.style.display = notStartedContainer.children.length ? 'none' : 'block';
+      activeTab = 'started';
+      tabStarted.classList.add('active');
+      tabNotStarted.classList.remove('active');
+      startedContainer.style.display = 'flex';
+      notStartedContainer.style.display = 'none';
+    } catch (err) {
+      errorMsg.textContent = 'Error loading banners: ' + err.message;
+      errorMsg.style.display = 'block';
+    }
+  }
+
+  function setMode(mode) {
+    if (currentMode === mode) return;
+    currentMode = mode;
+    btnCIS.classList.toggle('active', mode === 'cis');
+    btnSG.classList.toggle('active', mode === 'sg');
+    fetchBanners(mode);
+  }
+
+  btnCIS.addEventListener('click', () => setMode('cis'));
+  btnSG.addEventListener('click', () => setMode('sg'));
+
+  fetchBanners(currentMode);
+</script>
+</body>
+</html>
