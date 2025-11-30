@@ -2,9 +2,9 @@ from flask import Flask, render_template, jsonify
 import requests
 from datetime import timezone, timedelta
 
-app = Flask(__name__)
+app = Flask(name)
 
-API_BASE = "https://femboy-banner.vercel.app/api/banner"
+API_BASE = "https://rocky65-leaks.vercel.app/api/banner"
 
 # Kyrgyzstan timezone UTC+6
 KG_TZ = timezone(timedelta(hours=6))
@@ -42,5 +42,5 @@ def banner_data(mode):
     except requests.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
+if name == 'main':
     app.run(debug=True)
